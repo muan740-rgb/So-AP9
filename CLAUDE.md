@@ -98,9 +98,10 @@ export default function OrderPage({ params }) {
 suki-phi-noi/
 ├── app/
 │   ├── layout.js
-│   ├── page.js              (หน้าแรก — ทดสอบ deploy)
-│   ├── generate-qr/page.js  (placeholder รอพัฒนา)
-│   └── kitchen/page.js      (placeholder รอพัฒนา)
+│   ├── page.js                        (หน้าแรก — ทดสอบ deploy)
+│   ├── generate-qr/page.js            (พนักงานเปิดโต๊ะ + generate QR แล้ว)
+│   ├── order/[tableNumber]/page.js    (ลูกค้าสั่งอาหาร + เรียกเก็บเงิน แล้ว)
+│   └── kitchen/page.js                (placeholder รอพัฒนา)
 ├── lib/
 │   └── supabaseClient.js
 ├── .env.local.example
@@ -110,9 +111,19 @@ suki-phi-noi/
 └── README.md
 ```
 
+## ราคาต่อหัว (hardcode ไว้ใน `app/order/[tableNumber]/page.js`)
+- ผู้ใหญ่ (`adult_count`): **289 บาท/คน**
+- เด็ก (`child_count`): **145 บาท/คน**
+- ยอดรวมคำนวณจาก `adult_count × 289 + child_count × 145` ตอนกด "เรียกเก็บเงิน"
+- ถ้าราคาเปลี่ยนในอนาคต ให้แก้ค่าคงที่ `PRICE_ADULT` / `PRICE_CHILD` ที่ต้นไฟล์นั้น
+
+## กฎธุรกิจสำคัญที่ implement ไว้แล้วใน `/order/[tableNumber]`
+- เข้าหน้านี้ต้องเจอ `sessions` ที่ `table_number` ตรงกันและ `status = 'open'` เท่านั้น ไม่งั้นแสดง "โต๊ะนี้ยังไม่เปิดใช้งาน"
+- ตะกร้าจำกัดสูงสุด **10 รายการ (แถว) ต่อการส่งออเดอร์ 1 ครั้ง** — ถ้าเพิ่มเมนูเดิมที่มีอยู่แล้วในตะกร้า จะรวมจำนวนเข้าไปในแถวเดิม ไม่กินโควตา 10 รายการ
+- กด "ส่งออเดอร์" = insert 1 แถวใหม่ใน `orders` (ไม่ update แถวเดิม) แต่ละครั้งที่ส่งจะเป็นออเดอร์ใหม่เสมอ
+- กด "เรียกเก็บเงิน" → ยืนยัน → `update sessions set status='closed'` แบบเช็คซ้ำ `.eq('status','open')` ก่อน เพื่อกันปิดซ้ำ — ถ้า race แล้วมีคนปิดไปก่อน จะแจ้ง error ให้แจ้งพนักงานแทน
+
 ## ขั้นตอนถัดไปที่วางแผนไว้
-- สร้างหน้าสั่งอาหารแบบ dynamic route (เช่น `/order/[sessionId]`) — **ต้องใช้ `use()` unwrap params ตามกฎด้านบน**
-- ต่อ query จริงกับตาราง `menu_categories` / `menu_items` เพื่อแสดงเมนู
-- สร้างฟอร์มสั่งอาหารที่ insert เข้า `orders`
-- พัฒนาหน้า `/generate-qr` ให้ generate QR code จริงตาม `table_number`
-- พัฒนาหน้า `/kitchen` ให้ subscribe realtime ออเดอร์ใหม่จาก Supabase
+- พัฒนาหน้า `/kitchen` ให้ subscribe realtime ออเดอร์ใหม่จาก Supabase (ตาราง `orders`, filter ตาม `status`)
+- พิจารณาเพิ่มหน้า "ประวัติออเดอร์ของโต๊ะ" ให้ลูกค้าดูรายการที่สั่งไปแล้วทั้งหมดใน session
+- พิจารณาย้ายราคาต่อหัว (`PRICE_ADULT` / `PRICE_CHILD`) ไปเก็บในฐานข้อมูลแทน hardcode ถ้าต้องปรับราคาบ่อย
